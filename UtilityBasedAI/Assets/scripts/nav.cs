@@ -6,7 +6,7 @@ public class nav : MonoBehaviour
 {
     public Transform target;
     public NavMeshAgent agent;
-    Animator anim;
+    [HideInInspector]public Animator anim;
 
     Vector3 earlyPosition;
 
@@ -36,10 +36,16 @@ public class nav : MonoBehaviour
         }
 
         Vector2 direction = (transform.position - earlyPosition).normalized;
+        Debug.DrawRay(transform.position, direction, Color.blue);
 
-      
-        anim.SetFloat("x", direction.x);
-        anim.SetFloat("y", direction.y);
+       
+
+        if (!agent.isStopped)
+        {
+            anim.SetFloat("x", direction.x);
+            anim.SetFloat("y", direction.y);
+        }
+       
 
     }
 

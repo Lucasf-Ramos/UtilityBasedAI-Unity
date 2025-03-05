@@ -8,6 +8,8 @@ public class simController : MonoBehaviour
 {
 
     public List<currentNeeds> needsList = new List<currentNeeds>();
+    public List<Friend> friendsList = new List<Friend>();
+
     public float waitTimeToSort = 5f;
     public float coroutineWaitTime = 1f;
 
@@ -15,6 +17,9 @@ public class simController : MonoBehaviour
     int actualneedIndex = 0;
     Object actualObject;
     bool sort;
+
+    public bool inConversation;
+    public simController friendInConv;
 
     nav agent;
     void Start()
@@ -25,7 +30,7 @@ public class simController : MonoBehaviour
     }
     private void Update()
     {
-        agent.target = actualObject != null ? actualObject.transform : transform;
+        agent.target = actualObject != null ? actualObject.transform : inConversation?friendInConv.gameObject.transform: transform;
     }
     IEnumerator sortPrioritys()
     {
@@ -117,7 +122,7 @@ public class simController : MonoBehaviour
                 if (needsList[i].value > -99 && needsList[i].need != actualneed)
                 {
                     needsList[i].value -= 1+ needsList[i].decCurve.Evaluate(needsList[i].value);
-                    needsList[i].bar.value = needsList[i].value;
+                   // needsList[i].bar.value = needsList[i].value;
                    
 
 
@@ -136,8 +141,26 @@ public class simController : MonoBehaviour
                         sortByUrgency();
                     }
                 }
+                
             }
+            for (int i = 0; i < friendsList.Count; i++)
+            {
+                if (!inConversation){
+                    friendsList[i].missingValue += friendsList[i].friendship_Level * 0.1f;
 
+
+                    if (friendsList[i].missingValue > 100)
+                    {
+                        Debug.Log(gameObject.name + " gostaria de conversar com " + friendsList[i].friendData.name);
+                        inConversation = friendsList[i].friendData.talkRequest(this);
+                        if (inConversation)
+                        {
+                            friendsList[i].missingValue = 0;
+                        }
+                    }
+                }
+               
+            }
             yield return new WaitForSeconds(coroutineWaitTime);
          
         }
@@ -153,11 +176,25 @@ public class simController : MonoBehaviour
                 if (Vector2.Distance(actualObject.gameObject.transform.position, transform.position) < 0.5f)
                 {
                     needsList[actualneedIndex].value += actualObject.points * 0.5f;
-                    needsList[actualneedIndex].bar.value = needsList[actualneedIndex].value;
+                    agent.agent.isStopped = true;
+                    // needsList[actualneedIndex].bar.value = needsList[actualneedIndex].value;
+                }
+                else
+                {
+                    agent.agent.stoppingDistance = 0;
+                    agent.agent.isStopped = false;
                 }
 
                 if (needsList[actualneedIndex].value >= 100)
                 {
+                    if (inConversation)
+                    {
+                        inConversation = false;
+                        friendInConv.inConversation = false;
+                        friendInConv = null;
+                        StartCoroutine(sortPrioritys());
+                    }
+
                     actualneed = needs.none;
                     actualObject.inUse = false;
                     actualObject = null;
@@ -168,14 +205,131 @@ public class simController : MonoBehaviour
 
                 
           }
-            yield return new WaitForSeconds(coroutineWaitTime);
+          if (inConversation && friendInConv != null)
+          {
 
+
+                Vector2 direction = (friendInConv.transform.position - transform.position).normalized;
+                Debug.DrawRay(transform.position, direction, Color.green, 1);
+
+                if (Vector2.Distance(friendInConv.gameObject.transform.position, transform.position) < 3f)
+                {
+                    
+                   
+                   
+                        needsList[actualneedIndex].value += 1;
+                        agent.agent.isStopped = true;
+                        agent.agent.stoppingDistance = Vector2.Distance(friendInConv.gameObject.transform.position, transform.position);
+
+
+                        agent.anim.SetFloat("x", direction.x);
+                        agent.anim.SetFloat("y", direction.y);
+                   
+
+                   
+                   
+                }
+                else
+                {
+                    agent.agent.stoppingDistance = 0;
+                    agent.agent.isStopped = false;
+                }
+                
+                
+
+                if (needsList[actualneedIndex].value >= 100)
+                {
+                    exitConversation();
+                    if(friendInConv != null)
+                        friendInConv.exitConversation();
+
+
+                }
+
+
+            }
+            yield return new WaitForSeconds(coroutineWaitTime);
+          
         }
-       // needsList[actualneedIndex].value = 100;
+       
        
     }
 
-   
+    public bool talkRequest(simController p)
+    {
+        Friend pProfile = friendsList.Where(o => o.friendData == p).First();
+
+        if (pProfile != null)
+        {
+            if (actualneed == needs.none)
+            {
+
+                //Debug.Log(transform.name + " quer conversar tambem");
+                
+                conversation(p);
+                p.conversation(this);
+                pProfile.missingValue = 0;
+
+                return true;
+            }
+            else
+            {
+                if(pProfile.friendship_Level/100 > needsList[actualneedIndex].urgency.Evaluate(needsList[actualneedIndex].value))
+                {
+                   // Debug.Log(transform.name + " está ocupado(a) mas pode conversar");
+                  
+                    conversation(p);
+                    p.conversation(this);
+                    pProfile.missingValue = 0;
+                    return true;
+                }
+                else
+                {
+                   // Debug.Log(transform.name + " está ocupado(a), conversem mais tarde");
+                    return false;
+                }
+            }
+        }
+        return false;
+
+    }
+
+    public void conversation(simController p)
+    {
+        StopCoroutine(sortPrioritys());
+      
+
+        friendInConv = p;
+        inConversation = true; 
+     
+
+        if (needsList[actualneedIndex].need != needs.Social)
+        {
+            actualneedIndex = needsList.IndexOf(needsList.Where(o => o.need == needs.Social).First());
+            actualneed = needs.Social;
+            
+        }
+       
+        agent.target = friendInConv.gameObject.transform;
+      
+
+        if (actualObject != null)
+            actualObject.inUse = false;
+        actualObject = null;
+     
+
+        StartCoroutine(incNeeds());
+       
+    }
+    public void exitConversation()
+    {
+        inConversation = false;
+        friendInConv = null;
+        StartCoroutine(sortPrioritys());
+
+        actualneed = needs.none;
+        StopCoroutine(incNeeds());
+    }
 
 }
 
@@ -190,6 +344,16 @@ public class currentNeeds
     [Space]
     [Range(-100, 100)]
     public float value = 100; // decaimento da necessidade
-    [Space]
-    public Slider bar;
+    
+   
+}
+
+[System.Serializable]
+public class Friend
+{
+    public simController friendData;
+
+    [Range(0, 100)]
+    public int friendship_Level = 0;
+    public float missingValue = 0;
 }
