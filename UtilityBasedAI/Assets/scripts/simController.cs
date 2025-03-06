@@ -20,6 +20,9 @@ public class simController : MonoBehaviour
 
     public bool inConversation;
     public simController friendInConv;
+    int friendIndex;
+
+    bool incNeedsStarted = false;
 
     nav agent;
     void Start()
@@ -138,6 +141,8 @@ public class simController : MonoBehaviour
                         }
                        
                         StopCoroutine(incNeeds());
+                        Debug.Log("incNeeds Parada");
+                        incNeedsStarted = false;
                         sortByUrgency();
                     }
                 }
@@ -151,11 +156,12 @@ public class simController : MonoBehaviour
 
                     if (friendsList[i].missingValue > 100)
                     {
-                        Debug.Log(gameObject.name + " gostaria de conversar com " + friendsList[i].friendData.name);
+                        //Debug.Log(gameObject.name + " gostaria de conversar com " + friendsList[i].friendData.name);
                         inConversation = friendsList[i].friendData.talkRequest(this);
                         if (inConversation)
                         {
                             friendsList[i].missingValue = 0;
+                            friendIndex = i;
                         }
                     }
                 }
@@ -169,88 +175,112 @@ public class simController : MonoBehaviour
 
     IEnumerator incNeeds()
     {
-        while (true)
+        if (!incNeedsStarted)
         {
-          if(actualObject != null)
-          {
-                if (Vector2.Distance(actualObject.gameObject.transform.position, transform.position) < 0.5f)
+            Debug.Log("incNeeds iniciada em " + Time.time);
+            incNeedsStarted = true;
+            while (true)
+            {
+                if (actualObject != null)
                 {
-                    needsList[actualneedIndex].value += actualObject.points * 0.5f;
-                    agent.agent.isStopped = true;
-                    // needsList[actualneedIndex].bar.value = needsList[actualneedIndex].value;
-                }
-                else
-                {
-                    agent.agent.stoppingDistance = 0;
-                    agent.agent.isStopped = false;
-                }
-
-                if (needsList[actualneedIndex].value >= 100)
-                {
-                    if (inConversation)
+                    if (Vector2.Distance(actualObject.gameObject.transform.position, transform.position) < 0.5f)
                     {
-                        inConversation = false;
-                        friendInConv.inConversation = false;
-                        friendInConv = null;
-                        StartCoroutine(sortPrioritys());
+                        needsList[actualneedIndex].value += actualObject.points * 0.5f;
+                        if (!agent.agent.isStopped)
+                            agent.anim.Play(actualneed.ToString());
+                        agent.agent.isStopped = true;
+                        // needsList[actualneedIndex].bar.value = needsList[actualneedIndex].value;
+                    }
+                    else
+                    {
+                        if (agent.agent != null && agent.agent.isStopped)
+                            agent.anim.Play("None");
+                        agent.agent.stoppingDistance = 0;
+                        agent.agent.isStopped = false;
+                    }
+                    if (needsList[actualneedIndex].value >= 100)
+                    {
+                        if (inConversation)
+                        {
+                            inConversation = false;
+                            friendInConv.inConversation = false;
+                            friendInConv = null;
+                            StartCoroutine(sortPrioritys());
+                        }
+
+                        actualneed = needs.none;
+                        agent.anim.Play("None");
+                        actualObject.inUse = false;
+                        actualObject = null;
+                        StopCoroutine(incNeeds());
+                        incNeedsStarted = false;
+                        Debug.Log("incNeeds Parada");
                     }
 
-                    actualneed = needs.none;
-                    actualObject.inUse = false;
-                    actualObject = null;
-                    StopCoroutine(incNeeds());
+
+
+
                 }
-
-             
-
-                
-          }
-          if (inConversation && friendInConv != null)
-          {
-
-
-                Vector2 direction = (friendInConv.transform.position - transform.position).normalized;
-                Debug.DrawRay(transform.position, direction, Color.green, 1);
-
-                if (Vector2.Distance(friendInConv.gameObject.transform.position, transform.position) < 3f)
+                if (inConversation && friendInConv != null)
                 {
-                    
-                   
-                   
-                        needsList[actualneedIndex].value += 1;
+
+
+                    Vector2 direction = (friendInConv.transform.position - transform.position).normalized;
+                    Debug.DrawRay(transform.position, direction, Color.green, 1);
+
+                    if (Vector2.Distance(friendInConv.gameObject.transform.position, transform.position) < 3f)
+                    {
+
+
+
+                        needsList[actualneedIndex].value += friendsList[friendIndex].friendship_Level / 30f;
+                        if (!agent.agent.isStopped)
+                            agent.anim.Play("Social");
                         agent.agent.isStopped = true;
                         agent.agent.stoppingDistance = Vector2.Distance(friendInConv.gameObject.transform.position, transform.position);
 
 
                         agent.anim.SetFloat("x", direction.x);
                         agent.anim.SetFloat("y", direction.y);
-                   
 
-                   
-                   
+
+
+
+                    }
+                    else
+                    {
+                        if (agent.agent != null && agent.agent.isStopped)
+                            agent.anim.Play("None");
+                        agent.agent.stoppingDistance = 0;
+                        agent.agent.isStopped = false;
+                    }
+
+
+
+                    if (needsList[actualneedIndex].value >= 100)
+                    {
+                        agent.anim.Play("None");
+                        exitConversation();
+                        if (friendInConv != null)
+                            friendInConv.exitConversation();
+
+
+                    }
+
+
                 }
-                else
-                {
-                    agent.agent.stoppingDistance = 0;
-                    agent.agent.isStopped = false;
-                }
-                
-                
-
-                if (needsList[actualneedIndex].value >= 100)
-                {
-                    exitConversation();
-                    if(friendInConv != null)
-                        friendInConv.exitConversation();
-
-
-                }
-
+                yield return new WaitForSeconds(coroutineWaitTime);
 
             }
-            yield return new WaitForSeconds(coroutineWaitTime);
-          
         }
+        else
+        {
+            StopCoroutine(incNeeds());
+            incNeedsStarted = false;
+            Debug.Log("incNeeds Parada");
+            StartCoroutine(incNeeds());
+        }
+        
        
        
     }
@@ -269,7 +299,7 @@ public class simController : MonoBehaviour
                 conversation(p);
                 p.conversation(this);
                 pProfile.missingValue = 0;
-
+                friendIndex = friendsList.IndexOf(pProfile);
                 return true;
             }
             else
@@ -329,6 +359,8 @@ public class simController : MonoBehaviour
 
         actualneed = needs.none;
         StopCoroutine(incNeeds());
+        incNeedsStarted = false;
+        Debug.Log("incNeeds Parada");
     }
 
 }
