@@ -22,7 +22,7 @@ public class simController : MonoBehaviour
     public simController friendInConv;
     int friendIndex;
 
-    bool incNeedsStarted = false;
+    Coroutine incNeedsRoutine = null;
 
     nav agent;
     void Start()
@@ -33,7 +33,7 @@ public class simController : MonoBehaviour
     }
     private void Update()
     {
-        agent.target = actualObject != null ? actualObject.transform : inConversation?friendInConv.gameObject.transform: transform;
+        agent.target = actualObject != null ? actualObject.transform : inConversation ? friendInConv.gameObject.transform : transform;
     }
     IEnumerator sortPrioritys()
     {
@@ -58,78 +58,64 @@ public class simController : MonoBehaviour
     }
     public void findObjectforNeed()
     {
-        List<Object> filter = gameController.controller.objects.Where(o => o.effector == actualneed && o.inUse==false).ToList(); //da procura quais vão de encontro com o que é ele quer suprir
+        List<Object> filter = gameController.controller.objects.Where(o => o.effector == actualneed && o.inUse == false).ToList(); //da procura quais vão de encontro com o que é ele quer suprir
 
         if (filter.Count > 1)
         {
             //tem mais de um objeto com essa função
-            filter.Sort((a, b) => b.points.CompareTo(a.points) + Vector2.Distance(b.gameObject.transform.position, transform.position).CompareTo(Vector2.Distance(a.gameObject.transform.position, transform.position))/2);
-           
+            filter.Sort((a, b) => b.points.CompareTo(a.points) + Vector2.Distance(b.gameObject.transform.position, transform.position).CompareTo(Vector2.Distance(a.gameObject.transform.position, transform.position)) / 2);
 
             if (filter[0] != null)
             {
                 agent.target = filter[0].gameObject.transform;
                 actualObject = filter[0];
                 actualObject.inUse = true;
-                StartCoroutine(incNeeds());
+                StartIncNeeds();
             }
             else
             {
                 actualneed = needs.none;
             }
-         
 
-           
         }
-        else if(filter.Count == 1)
+        else if (filter.Count == 1)
         {
             //tem somente 1
-            
 
             if (filter[0] != null)
             {
                 actualObject = filter[0];
                 actualObject.inUse = true;
                 agent.target = filter[0].gameObject.transform;
-                StartCoroutine(incNeeds());
+                StartIncNeeds();
             }
             else
             {
                 actualneed = needs.none;
             }
-            
+
         }
         else
         {
-            //não existe nada para suprir isso
-
-            // Debug.Log($"{gameObject.name}: puxa vida, não tem nada para eu suprir minha {actualneed}");
-          
             actualneed = needs.none;
-       
         }
-        
+
     }
 
-   
+
 
     IEnumerator decNeeds()
     {
         while (true)
         {
-            
-           
-
-            for(int i = 0; i < needsList.Count; i++)
+            //needs
+            for (int i = 0; i < needsList.Count; i++)
             {
                 if (needsList[i].value > -99 && needsList[i].need != actualneed)
                 {
-                    needsList[i].value -= 1+ needsList[i].decCurve.Evaluate(needsList[i].value);
-                   // needsList[i].bar.value = needsList[i].value;
-                   
+                    needsList[i].value -= 1 + needsList[i].decCurve.Evaluate(needsList[i].value);
 
-
-                    if(needsList[i].value < -50 && needsList[actualneedIndex].value>0 && needsList[i].value * needsList[i].decCurve.Evaluate(needsList[i].value) < needsList[actualneedIndex].value * needsList[actualneedIndex].decCurve.Evaluate(needsList[actualneedIndex].value))
+                    if (needsList[i].value < -50 && needsList[actualneedIndex].value > 0 && needsList[i].value * needsList[i].decCurve.Evaluate(needsList[i].value) < needsList[actualneedIndex].value * needsList[actualneedIndex].decCurve.Evaluate(needsList[actualneedIndex].value))
                     {
                         actualneed = needs.none;
 
@@ -139,22 +125,27 @@ public class simController : MonoBehaviour
                             actualObject = null;
 
                         }
-                       
-                        StopCoroutine(incNeeds());
-                        Debug.Log("incNeeds Parada");
-                        incNeedsStarted = false;
+
+                        StopIncNeeds();
                         sortByUrgency();
                     }
                 }
-                
+                else if(needsList[i].value < -99 && needsList[i].need != needs.none)
+                {
+                    Debug.Log("aos " + Time.time + " " + gameObject.name + " chegou a 0 na necessidade " + needsList[i].need.ToString());
+                }
+
             }
+
+            //friendship
             for (int i = 0; i < friendsList.Count; i++)
             {
-                if (!inConversation){
+                if (!inConversation)
+                {
                     friendsList[i].missingValue += friendsList[i].friendship_Level * 0.1f;
 
 
-                    if (friendsList[i].missingValue > 100)
+                    if (friendsList[i].missingValue > 100 && talkRequest(friendsList[i].friendData))
                     {
                         //Debug.Log(gameObject.name + " gostaria de conversar com " + friendsList[i].friendData.name);
                         inConversation = friendsList[i].friendData.talkRequest(this);
@@ -165,129 +156,142 @@ public class simController : MonoBehaviour
                         }
                     }
                 }
-               
+
             }
             yield return new WaitForSeconds(coroutineWaitTime);
-         
+
         }
-   
+
     }
 
     IEnumerator incNeeds()
     {
-        if (!incNeedsStarted)
+        while (true)
         {
-            Debug.Log("incNeeds iniciada em " + Time.time);
-            incNeedsStarted = true;
-            while (true)
+            if (actualObject != null)
             {
-                if (actualObject != null)
+                if (Vector2.Distance(actualObject.gameObject.transform.position, transform.position) < 0.5f)
                 {
-                    if (Vector2.Distance(actualObject.gameObject.transform.position, transform.position) < 0.5f)
-                    {
-                        needsList[actualneedIndex].value += actualObject.points * 0.5f;
-                        if (!agent.agent.isStopped)
-                            agent.anim.Play(actualneed.ToString());
-                        agent.agent.isStopped = true;
-                        // needsList[actualneedIndex].bar.value = needsList[actualneedIndex].value;
-                    }
-                    else
-                    {
-                        if (agent.agent != null && agent.agent.isStopped)
-                            agent.anim.Play("None");
-                        agent.agent.stoppingDistance = 0;
-                        agent.agent.isStopped = false;
-                    }
-                    if (needsList[actualneedIndex].value >= 100)
-                    {
-                        if (inConversation)
-                        {
-                            inConversation = false;
-                            friendInConv.inConversation = false;
-                            friendInConv = null;
-                            StartCoroutine(sortPrioritys());
-                        }
-
-                        actualneed = needs.none;
-                        agent.anim.Play("None");
-                        actualObject.inUse = false;
-                        actualObject = null;
-                        StopCoroutine(incNeeds());
-                        incNeedsStarted = false;
-                        Debug.Log("incNeeds Parada");
-                    }
-
-
-
-
-                }
-                if (inConversation && friendInConv != null)
-                {
-
-
-                    Vector2 direction = (friendInConv.transform.position - transform.position).normalized;
-                    Debug.DrawRay(transform.position, direction, Color.green, 1);
-
-                    if (Vector2.Distance(friendInConv.gameObject.transform.position, transform.position) < 3f)
-                    {
-
-
-
-                        needsList[actualneedIndex].value += friendsList[friendIndex].friendship_Level / 30f;
-                        if (!agent.agent.isStopped)
-                            agent.anim.Play("Social");
-                        agent.agent.isStopped = true;
-                        agent.agent.stoppingDistance = Vector2.Distance(friendInConv.gameObject.transform.position, transform.position);
-
-
-                        agent.anim.SetFloat("x", direction.x);
-                        agent.anim.SetFloat("y", direction.y);
-
-
-
-
-                    }
-                    else
-                    {
-                        if (agent.agent != null && agent.agent.isStopped)
-                            agent.anim.Play("None");
-                        agent.agent.stoppingDistance = 0;
-                        agent.agent.isStopped = false;
-                    }
-
-
+                    //Doing something
+                    needsList[actualneedIndex].value += actualObject.points * 2f;
+                    if (!agent.agent.isStopped)
+                        agent.anim.Play(actualneed.ToString());
+                    agent.agent.isStopped = true;
 
                     if (needsList[actualneedIndex].value >= 100)
                     {
-                        agent.anim.Play("None");
-                        exitConversation();
-                        if (friendInConv != null)
-                            friendInConv.exitConversation();
-
-
+                        needsList[actualneedIndex].value = 100;
+                        StopIncNeeds();
                     }
 
-
                 }
-                yield return new WaitForSeconds(coroutineWaitTime);
+                else
+                {
+                    if (agent != null)
+                    {
+                        agent.anim.Play("None");
+                        agent.agent.isStopped = false;
+                    }
+                       
+                }
 
             }
+            if (inConversation && friendInConv != null)
+            {
+                Vector2 direction = (friendInConv.transform.position - transform.position).normalized;
+                Debug.DrawRay(transform.position, direction, Color.green, 1);
+
+                if (Vector2.Distance(friendInConv.gameObject.transform.position, transform.position) < 3f)
+                {
+                    //conversation Actions
+                    needsList[actualneedIndex].value += friendsList[friendIndex].friendship_Level / 10f;
+                    if (!agent.agent.isStopped)
+                        agent.anim.Play("Social");
+                    agent.agent.isStopped = true;
+                    agent.agent.stoppingDistance = Vector2.Distance(friendInConv.gameObject.transform.position, transform.position);
+
+
+                    agent.anim.SetFloat("x", direction.x);
+                    agent.anim.SetFloat("y", direction.y);
+
+
+                    if (needsList[actualneedIndex].value >= 100)
+                    {
+                        StopIncNeeds();
+                    }
+
+                }
+                else
+                {
+                    if (agent != null)
+                    {
+                        agent.anim.Play("None");
+                        agent.agent.isStopped = false;
+                    }
+                }
+
+            }
+            yield return new WaitForSeconds(coroutineWaitTime);
+
         }
-        else
+
+
+    }
+
+    void StopIncNeeds()
+    {
+        if (incNeedsRoutine != null)
         {
-            StopCoroutine(incNeeds());
-            incNeedsStarted = false;
-            Debug.Log("incNeeds Parada");
-            StartCoroutine(incNeeds());
+
+            StopCoroutine(incNeedsRoutine);
+            incNeedsRoutine = null;
+
+            if (inConversation)
+            {
+                exitConversation();
+                if (friendInConv != null)
+                    friendInConv.exitConversation();
+            }
+
+           
+
+            if (agent != null)
+            {
+                agent.agent.stoppingDistance = 0;
+                agent.agent.isStopped = false;
+                actualneed = needs.none;
+                agent.anim.Play("None");
+            }
+         
+
+            if(actualObject!= null)
+            {
+                actualObject.inUse = false;
+                actualObject = null;
+            }
+           
+
+           // Debug.Log("coroutine parada");
         }
-        
        
-       
+    }
+
+    void StartIncNeeds()
+    {
+        if(incNeedsRoutine == null)
+        {
+            StopIncNeeds(); // Para qualquer coroutine ativa antes de iniciar uma nova
+            
+            incNeedsRoutine = StartCoroutine(incNeeds());
+           // Debug.Log("coroutine iniciada");
+        }
+      
     }
 
     public bool talkRequest(simController p)
     {
         Friend pProfile = friendsList.Where(o => o.friendData == p).First();
+        currentNeeds n = needsList.Where(o => o.need == needs.Social).First();
 
         if (pProfile != null)
         {
@@ -295,7 +299,7 @@ public class simController : MonoBehaviour
             {
 
                 //Debug.Log(transform.name + " quer conversar tambem");
-                
+
                 conversation(p);
                 p.conversation(this);
                 pProfile.missingValue = 0;
@@ -304,10 +308,10 @@ public class simController : MonoBehaviour
             }
             else
             {
-                if(pProfile.friendship_Level/100 > needsList[actualneedIndex].urgency.Evaluate(needsList[actualneedIndex].value))
+                if (n.value*n.urgency.Evaluate(n.value) > needsList[actualneedIndex].urgency.Evaluate(needsList[actualneedIndex].value))
                 {
-                   // Debug.Log(transform.name + " está ocupado(a) mas pode conversar");
-                  
+                    // Debug.Log(transform.name + " está ocupado(a) mas pode conversar");
+
                     conversation(p);
                     p.conversation(this);
                     pProfile.missingValue = 0;
@@ -315,7 +319,7 @@ public class simController : MonoBehaviour
                 }
                 else
                 {
-                   // Debug.Log(transform.name + " está ocupado(a), conversem mais tarde");
+                    // Debug.Log(transform.name + " está ocupado(a), conversem mais tarde");
                     return false;
                 }
             }
@@ -327,29 +331,29 @@ public class simController : MonoBehaviour
     public void conversation(simController p)
     {
         StopCoroutine(sortPrioritys());
-      
+
 
         friendInConv = p;
-        inConversation = true; 
-     
+        inConversation = true;
+
 
         if (needsList[actualneedIndex].need != needs.Social)
         {
             actualneedIndex = needsList.IndexOf(needsList.Where(o => o.need == needs.Social).First());
             actualneed = needs.Social;
-            
+
         }
-       
+
         agent.target = friendInConv.gameObject.transform;
-      
+
 
         if (actualObject != null)
             actualObject.inUse = false;
         actualObject = null;
-     
 
-        StartCoroutine(incNeeds());
-       
+
+        StartIncNeeds();
+
     }
     public void exitConversation()
     {
@@ -358,9 +362,8 @@ public class simController : MonoBehaviour
         StartCoroutine(sortPrioritys());
 
         actualneed = needs.none;
-        StopCoroutine(incNeeds());
-        incNeedsStarted = false;
-        Debug.Log("incNeeds Parada");
+        StopIncNeeds();
+
     }
 
 }
@@ -376,8 +379,8 @@ public class currentNeeds
     [Space]
     [Range(-100, 100)]
     public float value = 100; // decaimento da necessidade
-    
-   
+
+
 }
 
 [System.Serializable]
