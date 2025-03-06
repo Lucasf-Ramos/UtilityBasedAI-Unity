@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using System.Linq;
+using Cinemachine;
+
 public class gameController : MonoBehaviour
 {
     public static gameController controller;
@@ -12,10 +14,13 @@ public class gameController : MonoBehaviour
     public GameObject menu;
     public Slider[] needBar;
     simController selectedSim;
+    CinemachineVirtualCamera cam;
+    
 
     void Awake()
     {
         controller = this;
+        cam = Camera.main.GetComponent<CinemachineVirtualCamera>();
         needBar = new Slider[menu.transform.childCount];
         for(int i = 0; i<needBar.Length; i++)
         {
@@ -24,6 +29,7 @@ public class gameController : MonoBehaviour
     }
     public void showNeedList(simController s)
     {
+        cam.Follow = s.gameObject.transform;
         if (!menu.activeInHierarchy || s != selectedSim)
         {
             selectedSim = s;
@@ -44,12 +50,17 @@ public class gameController : MonoBehaviour
     {
         while (true)
         {
-
-            for (int i = 0; i < needBar.Length; i++)
+            if(selectedSim != null)
             {
-                needBar[i].value = selectedSim.needsList.Where(o => o.need.ToString() == needBar[i].name).First().value;
+                for (int i = 0; i < needBar.Length; i++)
+                {
+                    needBar[i].value = selectedSim.needsList.Where(o => o.need.ToString() == needBar[i].name).First().value;
+
+                }
+                yield return new WaitForSeconds(selectedSim.coroutineWaitTime);
             }
-            yield return new WaitForSeconds(selectedSim.coroutineWaitTime);
+           
+           
 
         }
 

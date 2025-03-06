@@ -6,7 +6,8 @@ using UnityEngine.UI;
 
 public class simController : MonoBehaviour
 {
-
+    public string houseName;
+    [Space]
     public List<currentNeeds> needsList = new List<currentNeeds>();
     public List<Friend> friendsList = new List<Friend>();
 
@@ -25,6 +26,7 @@ public class simController : MonoBehaviour
     Coroutine incNeedsRoutine = null;
 
     nav agent;
+   
     void Start()
     {
         agent = GetComponent<nav>();
@@ -58,11 +60,12 @@ public class simController : MonoBehaviour
     }
     public void findObjectforNeed()
     {
-        List<Object> filter = gameController.controller.objects.Where(o => o.effector == actualneed && o.inUse == false).ToList(); //da procura quais vão de encontro com o que é ele quer suprir
+        List<Object> filter = gameController.controller.objects.Where(o => o.transform.parent.name == houseName && o.effector == actualneed && o.inUse == false ).ToList(); //da procura quais vão de encontro com o que é ele quer suprir
 
         if (filter.Count > 1)
         {
             //tem mais de um objeto com essa função
+          
             filter.Sort((a, b) => b.points.CompareTo(a.points) + Vector2.Distance(b.gameObject.transform.position, transform.position).CompareTo(Vector2.Distance(a.gameObject.transform.position, transform.position)) / 2);
 
             if (filter[0] != null)
@@ -189,7 +192,8 @@ public class simController : MonoBehaviour
                 {
                     if (agent != null)
                     {
-                        agent.anim.Play("None");
+                        if (agent.anim != null)
+                            agent.anim.Play("None");
                         agent.agent.isStopped = false;
                     }
                        
@@ -225,7 +229,8 @@ public class simController : MonoBehaviour
                 {
                     if (agent != null)
                     {
-                        agent.anim.Play("None");
+                        if (agent.anim != null)
+                            agent.anim.Play("None");
                         agent.agent.isStopped = false;
                     }
                 }
