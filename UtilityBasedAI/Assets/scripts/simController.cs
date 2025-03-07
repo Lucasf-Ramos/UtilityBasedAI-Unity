@@ -22,6 +22,7 @@ public class simController : MonoBehaviour
     public bool inConversation;
     public simController friendInConv;
     int friendIndex;
+    int Friendrandomness; //adiciona uma aleatoriedade para aonde eles vão conversar
 
     Coroutine incNeedsRoutine = null;
 
@@ -35,7 +36,7 @@ public class simController : MonoBehaviour
     }
     private void Update()
     {
-        agent.target = actualObject != null ? actualObject.transform : inConversation ? friendInConv.gameObject.transform : transform;
+        agent.target = actualObject != null ? actualObject.transform : inConversation && Friendrandomness==0 ? friendInConv.gameObject.transform : transform;
     }
     IEnumerator sortPrioritys()
     {
@@ -135,6 +136,7 @@ public class simController : MonoBehaviour
                 }
                 else if(needsList[i].value < -99 && needsList[i].need != needs.none)
                 {
+                    sortByUrgency();
                     Debug.Log("aos " + Time.time + " " + gameObject.name + " chegou a 0 na necessidade " + needsList[i].need.ToString());
                 }
 
@@ -297,6 +299,13 @@ public class simController : MonoBehaviour
     {
         Friend pProfile = friendsList.Where(o => o.friendData == p).First();
         currentNeeds n = needsList.Where(o => o.need == needs.Social).First();
+
+        Friendrandomness = Random.Range(0, 2);
+        pProfile.friendData.Friendrandomness = Random.Range(0, 2);
+
+        if (pProfile.friendData.Friendrandomness + Friendrandomness == 2)
+            return false;
+
 
         if (pProfile != null)
         {

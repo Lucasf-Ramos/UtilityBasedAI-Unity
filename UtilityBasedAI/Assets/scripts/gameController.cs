@@ -30,20 +30,21 @@ public class gameController : MonoBehaviour
     public void showNeedList(simController s)
     {
         cam.Follow = s.gameObject.transform;
-        if (!menu.activeInHierarchy || s != selectedSim)
+        
+        if (!menu.activeInHierarchy && s == selectedSim)
         {
-            selectedSim = s;
             menu.SetActive(true);
+            StopCoroutine(changeSlider());
             StartCoroutine(changeSlider());
         }
         else
         {
-            
+       
             menu.SetActive(false);
             StopCoroutine(changeSlider());
-            selectedSim = null;
+            
         }
-       
+        selectedSim = s;
     }
 
     IEnumerator changeSlider()
@@ -63,7 +64,7 @@ public class gameController : MonoBehaviour
            
 
         }
-
+        selectedSim = null;
     }
 
 
